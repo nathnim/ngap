@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bản sao số Ngập Đô thị</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Roboto+Condensed:wght@600;700&family=Roboto+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+  <aside>
+    <header class="top">
+      <div class="eyebrow">Digital Twin · Thoát nước đô thị</div>
+      <h1>Bản sao số dự báo ngập</h1>
+      <p class="sub">Nền OpenStreetMap. Dự báo bằng mô hình dòng chảy mặt 2D, hoặc xem lại hiện trạng ngập qua các trận mưa, triều cường lịch sử ở Hà Nội và TP.HCM.</p>
+      <div class="tabs" role="tablist">
+        <button role="tab" id="tabFc" aria-selected="true">Dự báo ngập</button>
+        <button role="tab" id="tabHist" aria-selected="false">Lịch sử ngập</button>
+      </div>
+    </header>
+    <div id="fcPanel">
+
+    <section class="blk">
+      <h2>1 · Vùng nghiên cứu <span class="n" id="srcBadge"></span></h2>
+      <label class="f">Vị trí mẫu
+        <select id="loc"></select>
+      </label>
+      <div class="row">
+        <label class="f">Cạnh vùng <span class="u" id="sizeV">1,6 km</span>
+          <input id="size" type="range" min="0.6" max="3" step="0.2" value="1.6">
+        </label>
+        <label class="f">Kích thước ô lưới
+          <select id="cell"><option value="10">10 m</option><option value="15">15 m</option><option value="20" selected>20 m</option><option value="30">30 m</option><option value="40">40 m</option></select>
+        </label>
+      </div>
+      <div class="btns">
+        <button id="useView">Dùng tâm bản đồ hiện tại</button>
+        <button id="build" class="primary">Xây dựng mô hình</button>
+      </div>
+      <ul class="steps" id="steps">
+        <li data-s="osm">Tải đường, nhà, sông hồ từ OpenStreetMap</li>
+        <li data-s="dem">Tải cao độ địa hình (Open-Meteo / Copernicus)</li>
+        <li data-s="ras">Lưới hóa: mặt phủ, hệ số thấm, độ nhám</li>
+        <li data-s="ok">Sẵn sàng mô phỏng</li>
+      </ul>
+    </section>
+
+    <section class="blk">
+      <h2>2 · Kịch bản mưa</h2>
+      <div class="chips" id="presets"></div>
+      <div class="row three">
+        <label class="f">Tổng lượng <span class="u">mm</span><input id="P" type="number" min="1" max="1000" step="5" value="100"></label>
+        <label class="f">Thời gian mưa <span class="u">giờ</span><input id="D" type="number" min="0.25" max="48" step="0.25" value="2"></label>
+        <label class="f">Sau mưa <span class="u">giờ</span><input id="tail" type="number" min="0" max="24" step="0.5" value="2"></label>
+      </div>
+      <label class="f">Dạng biểu đồ mưa
+        <select id="shape"><option value="peak" selected>Đỉnh nhọn (kiểu Chicago, đỉnh ở 35% thời gian)</option><option value="tri">Tam giác (đỉnh ở 1/3)</option><option value="uni">Đều</option></select>
+      </label>
+    </section>
+
+    <section class="blk">
+      <h2>3 · Hệ thống thoát nước</h2>
+      <div class="row">
+        <label class="f">Năng lực thoát qua cống <span class="u">mm/h tương đương</span><input id="drain" type="number" min="0" max="300" step="5" value="45"></label>
+        <label class="f">Thấm mặt đất tự nhiên <span class="u">mm/h</span><input id="infil" type="number" min="0" max="100" step="1" value="10"></label>
+        <label class="f">Tỷ lệ không thấm nền đô thị <span class="u">0–1</span><input id="baseImp" type="number" min="0" max="1" step="0.05" value="0.6"></label>
+        <label class="f">Mặt đường thấp hơn hè <span class="u">m</span><input id="kerb" type="number" min="0" max="0.5" step="0.05" value="0.15"></label>
+        <label class="f">Nước sông/hồ dâng thêm <span class="u">m</span><input id="rise" type="number" min="0" max="3" step="0.1" value="0"></label>
+        <label class="f">Làm trơn DEM <span class="u">số lượt</span><input id="smooth" type="number" min="0" max="6" step="1" value="2"></label>
+      </div>
+      <p class="note">Thông số thoát nước và thấm áp dụng ngay khi đang chạy. Làm trơn DEM và mặt đường cần “Xây dựng mô hình” lại.</p>
+    </section>
+
+    <section class="blk">
+      <h2>4 · Mô phỏng <span class="n" id="dtInfo"></span></h2>
+      <div class="btns">
+        <button id="run" class="primary" disabled>▶ Chạy</button>
+        <button id="reset" disabled>Đặt lại</button>
+        <select id="speed" style="width:auto"><option value="300">×300</option><option value="900" selected>×900</option><option value="1800">×1800</option><option value="3600">×3600</option></select>
+      </div>
+      <div class="progress"><div id="prog"></div></div>
+      <div class="clock"><span id="clock">t = 00:00</span><span id="intens">i = 0 mm/h</span></div>
+      <div class="kpis">
+        <div class="kpi"><div class="k">Diện tích ngập ≥ 15 cm</div><div class="v" id="kA">0 <small>ha</small></div></div>
+        <div class="kpi"><div class="k">Độ sâu lớn nhất</div><div class="v" id="kD">0 <small>cm</small></div></div>
+        <div class="kpi"><div class="k">Thể tích nước đọng</div><div class="v" id="kV">0 <small>m³</small></div></div>
+        <div class="kpi"><div class="k">Lượng mưa đã rơi</div><div class="v" id="kR">0 <small>mm</small></div></div>
+      </div>
+      <canvas class="chart" id="chartMain" aria-label="Biểu đồ cường độ mưa và diện tích ngập theo thời gian"></canvas>
+      <p class="note" id="balance">Cân bằng nước sẽ hiện khi chạy.</p>
+    </section>
+
+    <section class="blk">
+      <h2>5 · Tuyến đường bị ngập <span class="n">sâu nhất hiện tại</span></h2>
+      <ul class="roads" id="roads"><li class="empty" style="cursor:default">Chưa có tuyến ngập.</li></ul>
+      <div class="btns"><button id="csvRoads">Xuất CSV tuyến đường</button><button id="csvTs">Xuất CSV chuỗi thời gian</button></div>
+    </section>
+
+    <section class="blk">
+      <h2>6 · Điểm quan trắc</h2>
+      <p class="note" id="probeInfo">Bấm vào một điểm trên bản đồ để đặt “cảm biến” và xem diễn biến độ sâu nước tại đó.</p>
+      <canvas class="chart" id="chartProbe" aria-label="Độ sâu nước tại điểm quan trắc"></canvas>
+    </section>
+
+    <section class="blk">
+      <details>
+        <summary>Cách mô hình tính (kèm ví dụ số)</summary>
+        <p>Vùng được chia thành ô vuông cạnh Δx. Mỗi bước thời gian Δt, mỗi ô được tính theo 4 bước:</p>
+        <div class="math">① Mưa rơi:   h += i·Δt
+② Mất nước:  h -= (q_cống + f·(1 − k_kt))·Δt
+③ Chảy sang ô bên cạnh (Manning):
+   v = h_f^(2/3)·√S / n ,  S = Δ(mặt nước)/Δx
+   Δh = v·h_f·Δt/Δx   (≤ Δmặt nước/4, ≤ h/4)
+④ Ô sông/hồ giữ mực nước = mực nền + nước dâng</div>
+        <p><b>Ví dụ:</b> Δx = 20 m, Δt = 4 s, mưa i = 80 mm/h, cống 45 mm/h, thấm 10 mm/h, k_kt = 0,8.</p>
+        <div class="math">① +80/3600·4         = +0,089 mm
+② −(45 + 10·0,2)/3600·4 = −0,052 mm
+   → lượng đọng thêm   = +0,037 mm/bước
+③ h_f = 0,10 m, chênh mặt nước 0,02 m, n = 0,02
+   S = 0,02/20 = 0,001
+   v = 0,10^(2/3)·√0,001/0,02 = 0,215·0,0316/0,02
+     = 0,34 m/s
+   Δh = 0,34·0,10·4/20 = 0,0068 m
+   giới hạn 0,02/4 = 0,005 m → chuyển 5 mm</div>
+        <p class="note">Độ nhám n nội suy theo tỷ lệ không thấm: 0,016 (bê tông nhựa) đến 0,045 (đất cỏ). Ngưỡng tác động giao thông chỉ mang tính tham khảo.</p>
+      </details>
+      <p class="note"><b>Giới hạn:</b> DEM Copernicus độ phân giải ~90 m và là mô hình bề mặt (có thể gồm một phần nhà, cây), nên chỉ phù hợp đánh giá sơ bộ, giảng dạy và so sánh kịch bản. Mạng cống được quy đổi thành năng lực thoát đều trên diện tích, chưa mô phỏng từng tuyến cống, giếng thu.</p>
+    </section>
+
+    </div><!-- /fcPanel -->
+    <div id="histPanel" hidden>
+    <section class="blk">
+      <h2>Thành phố</h2>
+      <div class="chips" id="hCity">
+        <button class="chip" type="button" data-c="HN" aria-pressed="true">Hà Nội</button>
+        <button class="chip" type="button" data-c="HCM" aria-pressed="false">TP.HCM</button>
+      </div>
+      <canvas class="chart" id="hChart" style="height:110px" aria-label="Số điểm ngập ghi nhận theo từng trận"></canvas>
+      <p class="note">Cột là số điểm ngập được báo cáo trong mỗi trận (theo báo chí, đơn vị thoát nước). Bấm cột hoặc chọn trận bên dưới.</p>
+    </section>
+    <section class="blk">
+      <h2>Trận ngập <span class="n" id="hCount"></span></h2>
+      <div class="chips" id="hEvents"></div>
+      <label class="f" style="flex-direction:row;align-items:center;gap:6px;color:var(--ink)"><input type="checkbox" id="hHalo" style="width:auto" checked> Hiện vùng từng ngập (lớp xanh mờ)</label>
+      <label class="f" style="flex-direction:row;align-items:center;gap:6px;color:var(--ink)"><input type="checkbox" id="hRisk" style="width:auto"> Hiện danh mục điểm có nguy cơ ngập (của cơ quan quản lý)</label>
+      <div id="hCard" class="hcard"></div>
+    </section>
+    <section class="blk">
+      <h2>Lộ trình tránh ngập <span class="n">xe máy, ô tô</span></h2>
+      <div class="rt"><span class="tag a">A</span><span id="rA" class="rv">Chưa chọn điểm đi</span><button type="button" data-pick="a">Chọn trên bản đồ</button></div>
+      <div class="rt"><span class="tag b">B</span><span id="rB" class="rv">Chưa chọn điểm đến</span><button type="button" data-pick="b">Chọn trên bản đồ</button></div>
+      <div class="btns"><button id="rGo" class="primary" disabled>Tìm lộ trình</button><button id="rClr">Xóa</button></div>
+      <ul class="roads" id="rList"></ul>
+      <p class="note">Tối đa 3 phương án từ OSRM, xếp theo số điểm từng ngập và điểm đang báo ngập nằm trong 150 m quanh tuyến. Có thể chọn điểm A, B từ ô tìm kiếm.</p>
+    </section>
+    <section class="blk">
+      <h2>Báo điểm ngập <span class="n" id="repN"></span></h2>
+      <div class="btns"><button id="repBtn">＋ Báo ngập tại một điểm</button><button id="repCsv">Xuất báo cáo</button></div>
+      <ul class="roads" id="repList"></ul>
+      <p class="note">Báo cáo lưu trong trình duyệt này và tự gộp vào lịch sử theo ngày. Để thu thập từ nhiều người (ví dụ sinh viên khảo sát hiện trường), mỗi người xuất CSV rồi nhập chung ở mục Dữ liệu.</p>
+    </section>
+    <section class="blk">
+      <h2>Điểm ngập <span class="n" id="hPtsN"></span></h2>
+      <ul class="roads" id="hPts"></ul>
+    </section>
+    <section class="blk">
+      <h2>Dữ liệu</h2>
+      <p class="note" id="hGeo">Vị trí điểm: đang đối chiếu với OpenStreetMap…</p>
+      <div class="btns">
+        <label class="btnlike" for="hImport">Nhập CSV của bạn</label><input type="file" id="hImport" accept=".csv,text/csv" hidden>
+        <button id="hCsv">Xuất CSV</button><button id="hGeoJSON">Xuất GeoJSON</button>
+      </div>
+      <p class="note">CSV nhập vào cần các cột: <code>thanh_pho,ngay,ten_diem,vi_do,kinh_do,do_sau_cm,ghi_chu</code> (thanh_pho là HN hoặc HCM; ngay dạng 2025-09-30). Mỗi ngày khác nhau tạo thành một trận.</p>
+    </section>
+    <section class="blk refs">
+      <h2>Tài liệu tham khảo <span class="n">thời điểm và nguồn số liệu</span></h2>
+      <div id="refList"></div>
+      <p class="note">Dữ liệu tổng hợp từ báo chí và thông báo của Công ty Thoát nước Hà Nội, Sở Xây dựng, Sở Nông nghiệp và Môi trường TP.HCM. Mỗi nguồn chỉ nêu một phần các điểm, phần lớn không ghi độ sâu, nên bản đồ thể hiện các điểm <b>được ghi nhận</b>, không phải toàn bộ vùng ngập. Tọa độ được bắt vào tuyến phố, giao lộ trên OpenStreetMap; điểm không khớp giữ vị trí gần đúng (viền đứt). TP.HCM theo địa giới sau sáp nhập 2025, gồm cả Bình Dương và Bà Rịa – Vũng Tàu cũ.</p>
+      <p class="note">Dữ liệu nằm trong tệp <code>js/data-lich-su.js</code>, có thể bổ sung trận mới trực tiếp tại đó.</p>
+    </section>
+    </div><!-- /histPanel -->
+
+    <footer class="credit">
+      TS. Đặng Minh Tân · Bộ môn Đường bộ – Sân bay · Trường Đại học Giao thông Vận tải<br>
+      Dữ liệu bản đồ © những người đóng góp OpenStreetMap (ODbL) · Cao độ: Copernicus DEM qua Open-Meteo.
+    </footer>
+  </aside>
+
+  <div class="mapwrap">
+    <div id="map"></div>
+    <div class="ov layers">
+      <div class="search"><input id="q" type="search" placeholder="Tìm đường, phố, điểm ngập…" autocomplete="off" aria-label="Tìm kiếm"><ul id="qres" hidden></ul></div>
+      <select id="view" aria-label="Lớp hiển thị">
+        <option value="cur">Độ sâu hiện tại</option>
+        <option value="max">Độ sâu lớn nhất</option>
+        <option value="dem">Cao độ địa hình</option>
+        <option value="imp">Tỷ lệ không thấm</option>
+      </select>
+      <select id="base" aria-label="Bản đồ nền">
+        <option value="light">Carto sáng (OSM)</option>
+        <option value="dark">Carto tối (OSM)</option>
+        <option value="osm">OSM chuẩn</option>
+        <option value="hot">OSM Nhân đạo</option>
+      </select>
+      <label><input type="checkbox" id="roadsOn" checked> Tô màu đường</label>
+      <label><input type="checkbox" id="radarOn"> Radar mưa</label>
+      <span class="radar" id="radarCtl" hidden><button id="radarPlay" type="button" aria-label="Phát radar">▶</button><span id="radarTime">--:--</span></span>
+    </div>
+    <div class="ov readout" id="readout">Di chuột trên vùng mô hình</div>
+    <div class="ov legend" id="legend"></div>
+    <div class="pickhint" id="pickHint" hidden></div>
+    <div class="ov busy" id="busy" hidden><div class="box" id="busyMsg">Đang tải…</div></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="core.js"></script>          <!-- lõi tính toán: mô hình thủy lực, lưới hóa, mưa thiết kế -->
+<script src="data-lich-su.js"></script>  <!-- dữ liệu lịch sử ngập và nguồn tham khảo -->
+<script src="app.js"></script>           <!-- giao diện dự báo -->
+<script src="lich-su.js"></script>       <!-- giao diện lịch sử ngập -->
+<script src="truc-tuyen.js"></script>    <!-- radar, tìm kiếm, lộ trình, báo ngập -->
+</body>
+</html>
