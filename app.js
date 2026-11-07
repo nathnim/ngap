@@ -32,15 +32,17 @@ function stats(){ return FloodCore.stats(G); }
 
 /* ============ Bản đồ ============ */
 const map=L.map("map",{zoomControl:true,preferCanvas:true}).setView(LOCS[0].c,15);
-const BASES={
-  osm:["https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'],
-  hot:["https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png",'© OpenStreetMap, HOT'],
-  light:["https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",'© OpenStreetMap © CARTO'],
-  dark:["https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",'© OpenStreetMap © CARTO']
+const BASES={ // Nền bản đồ miễn phí, không cần API key: [url, ghi nguồn, mức zoom gốc tối đa]
+  light:["https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}",'Tiles © <a href="https://www.esri.com" target="_blank" rel="noopener">Esri</a>',16],
+  dark:["https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",'Tiles © <a href="https://www.esri.com" target="_blank" rel="noopener">Esri</a>',16],
+  osm:["https://tile.openstreetmap.org/{z}/{x}/{y}.png",'© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>',19],
+  hot:["https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png",'© OpenStreetMap, HOT',19],
+  topo:["https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",'© OpenStreetMap, SRTM | © <a href="https://opentopomap.org" target="_blank" rel="noopener">OpenTopoMap</a>',17],
+  sat:["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",'Ảnh vệ tinh © <a href="https://www.esri.com" target="_blank" rel="noopener">Esri</a>',19]
 };
 let baseLayer=null;
-function setBase(k){ if(baseLayer) map.removeLayer(baseLayer);
-  baseLayer=L.tileLayer(BASES[k][0],{maxZoom:19,attribution:BASES[k][1]+' · DEM Copernicus/Open-Meteo'}).addTo(map); }
+function setBase(k){ if(!BASES[k]) k="light"; if(baseLayer) map.removeLayer(baseLayer);
+  baseLayer=L.tileLayer(BASES[k][0],{maxZoom:19,maxNativeZoom:BASES[k][2],attribution:BASES[k][1]+' · DEM Copernicus/Open-Meteo'}).addTo(map); }
 setBase("light");
 const roadRenderer=L.canvas({padding:0.3});
 let bboxRect=null, floodOverlay=null, roadLayer=L.layerGroup().addTo(map), probeMarker=null;
